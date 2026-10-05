@@ -102,7 +102,7 @@ services:
 cmd/server/                 진입점과 조립(wire.go)
 internal/
   config/                   환경 변수 로드·검증
-  domain/                   user · couple · dating · photo · push · health (순수 Go)
+  domain/                   user · couple · dating · photo · diary · push · apperr · health (순수 Go)
   application/
     port/in, port/out       유스케이스와 인프라 인터페이스
     service/                유스케이스 구현 (fake 포트로 단위 테스트)
