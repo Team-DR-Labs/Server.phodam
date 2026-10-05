@@ -55,5 +55,6 @@ func newAPI(cfg config.Config, deps service.Deps, logger *slog.Logger) httpadapt
 		httpadapter.NewCoupleHandler(service.NewCoupleService(deps), auth, logger),
 		httpadapter.NewDateHandler(service.NewDateService(deps), photos, auth, logger),
 		httpadapter.NewPhotoHandler(photos, auth, logger),
+		httpadapter.NewDiaryHandler(service.NewDiaryService(deps), auth, logger),
 	)
 }

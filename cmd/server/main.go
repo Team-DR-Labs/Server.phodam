@@ -11,12 +11,14 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
 
 	httpadapter "github.com/Team-DR-Labs/Server.phodam/internal/adapter/in/http"
+	"github.com/Team-DR-Labs/Server.phodam/internal/adapter/in/scheduler"
 	"github.com/Team-DR-Labs/Server.phodam/internal/adapter/out/persistence/postgres"
 	"github.com/Team-DR-Labs/Server.phodam/internal/application/service"
 	"github.com/Team-DR-Labs/Server.phodam/internal/config"
@@ -62,6 +64,15 @@ func run(logger *slog.Logger) error {
 		httpadapter.NewHealthHandler(healthService, logger),
 		newAPI(cfg, deps, logger),
 	)
+
+	// 워커는 HTTP 서버와 같은 수명이다. 종료 신호를 받으면 진행 중인 주기를 마친 뒤 멈춘다.
+	var workers sync.WaitGroup
+	worker := scheduler.NewWorker(service.NewMaintenanceService(deps), cfg.Worker.Interval, logger)
+	workers.Go(func() { worker.Run(ctx) })
+	defer func() {
+		stop()
+		workers.Wait()
+	}()
 
 	srv := &http.Server{
 		Addr:              ":" + strconv.Itoa(cfg.App.Port),
