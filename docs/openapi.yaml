@@ -5,7 +5,9 @@ info:
   description: |
     포담 1차 MVP API. 동작 규칙은 docs/mvp-policy.md 를 따른다.
     - 모든 시각은 RFC 3339 UTC.
-    - 에러는 ErrorResponse 이며 앱은 `code` 로만 분기한다.
+    - 에러는 ErrorResponse 이며 앱은 `code` 로만 분기한다. 명시되지 않은 상태는 default(주로 500 INTERNAL_ERROR).
+    - 남의 리소스·형식이 틀린 UUID 경로는 존재를 숨기기 위해 404 NOT_FOUND 로 응답한다.
+    - 커플이 없으면 커플 필요 엔드포인트는 403 COUPLE_REQUIRED.
 servers:
   - url: http://localhost:8080/v1
     description: local
@@ -36,6 +38,7 @@ paths:
         '200': { $ref: '#/components/responses/Auth' }
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
   /auth/google:
     post:
       operationId: loginGoogle
@@ -51,6 +54,7 @@ paths:
         '200': { $ref: '#/components/responses/Auth' }
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
   /auth/dev:
     post:
       operationId: loginDev
@@ -66,6 +70,7 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/Auth' }
         '400': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
   /auth/refresh:
     post:
       operationId: refreshToken
@@ -80,6 +85,7 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/Auth' }
         '401': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
   /auth/logout:
     post:
       operationId: logout
@@ -93,6 +99,7 @@ paths:
       responses:
         '204': { description: 폐기 완료 (이미 폐기된 토큰도 204) }
         '401': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
 
   /me:
     get:
@@ -106,6 +113,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Me' }
         '401': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
     patch:
       operationId: updateMe
       tags: [me]
@@ -123,6 +131,7 @@ paths:
               schema: { $ref: '#/components/schemas/Me' }
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
   /me/devices:
     put:
       operationId: registerDevice
@@ -137,6 +146,7 @@ paths:
         '204': { description: 등록 완료 }
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
 
   /couple:
     get:
@@ -150,6 +160,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Couple' }
         '403': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
   /couple/invites:
     post:
       operationId: createInvite
@@ -162,6 +173,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Invite' }
         '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
   /couple/join:
     post:
       operationId: joinCouple
@@ -180,6 +192,7 @@ paths:
               schema: { $ref: '#/components/schemas/Couple' }
         '400': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
 
   /dates:
     post:
@@ -194,6 +207,7 @@ paths:
               schema: { $ref: '#/components/schemas/DateView' }
         '403': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
   /dates/current:
     get:
       operationId: getCurrentDate
@@ -207,6 +221,7 @@ paths:
               schema: { $ref: '#/components/schemas/DateView' }
         '204': { description: 진행 중 데이트 없음 }
         '403': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
   /dates/{dateId}:
     get:
       operationId: getDate
@@ -220,6 +235,8 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/DateView' }
         '404': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
   /dates/{dateId}/join:
     post:
       operationId: joinDate
@@ -234,6 +251,8 @@ paths:
               schema: { $ref: '#/components/schemas/DateView' }
         '404': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
   /dates/{dateId}/shots:
     post:
       operationId: reserveShot
@@ -248,6 +267,8 @@ paths:
               schema: { $ref: '#/components/schemas/ShotReservation' }
         '404': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
   /dates/{dateId}/my-photos:
     get:
       operationId: listMyPhotos
@@ -261,6 +282,9 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/PhotoList' }
         '404': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
   /dates/{dateId}/submit:
     post:
       operationId: submitDate
@@ -281,6 +305,8 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
   /dates/{dateId}/receivable:
     get:
       operationId: getReceivable
@@ -295,6 +321,8 @@ paths:
               schema: { $ref: '#/components/schemas/Receivable' }
         '404': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
 
   /photos/{photoId}/upload-url:
     post:
@@ -310,6 +338,8 @@ paths:
               schema: { $ref: '#/components/schemas/UploadTarget' }
         '404': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
   /photos/{photoId}/complete:
     post:
       operationId: completeUpload
@@ -325,6 +355,8 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
   /photos/{photoId}/received:
     post:
       operationId: ackReceived
@@ -339,6 +371,8 @@ paths:
               schema: { $ref: '#/components/schemas/Photo' }
         '404': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
 
   /diaries:
     get:
@@ -359,6 +393,8 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/DiaryList' }
         '403': { $ref: '#/components/responses/Error' }
+        '400': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
   /diaries/{dateId}:
     get:
       operationId: getDiary
@@ -372,6 +408,8 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/DiaryDetail' }
         '404': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
 
   /admin/users/{userId}/film-grants:
     post:
@@ -398,6 +436,7 @@ paths:
               schema: { $ref: '#/components/schemas/FilmGrantResponse' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
 
 components:
   securitySchemes:

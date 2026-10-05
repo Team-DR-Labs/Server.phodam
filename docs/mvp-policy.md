@@ -148,9 +148,9 @@ in_progress ──(두 사람 모두 제출)──▶ revealed
 | 401 | `UNAUTHORIZED` | 액세스 토큰 없음, 만료, 위조 |
 | 401 | `AUTH_INVALID_ID_TOKEN` | Apple/Google 토큰 검증 실패 |
 | 401 | `AUTH_INVALID_REFRESH_TOKEN` | 리프레시 토큰 없음, 만료, 폐기 |
-| 403 | `FORBIDDEN` | 관리자 키 오류, 남의 리소스 |
+| 403 | `FORBIDDEN` | 관리자 키 오류 |
 | 403 | `COUPLE_REQUIRED` | 커플이 없음 |
-| 404 | `NOT_FOUND` | 리소스 없음 또는 열람 권한 없음 |
+| 404 | `NOT_FOUND` | 리소스 없음, 남의 리소스, 형식이 틀린 UUID 경로(존재 여부를 숨김), reserved 가 아닌 사진의 업로드 URL 재발급 |
 | 409 | `COUPLE_ALREADY_CONNECTED` | 본인이나 상대가 이미 연결됨 |
 | 400 | `INVITE_INVALID` | 코드 없음, 만료, 사용됨, 본인 코드 |
 | 409 | `DATE_ALREADY_IN_PROGRESS` | 진행 중 데이트 있음 |
