@@ -51,3 +51,6 @@ grant-film: ## 필름 수동 지급: make grant-film USER=<uuid> SHOTS=24 (ADMIN
 		-H "X-Admin-Key: $(ADMIN_API_KEY)" -H "Content-Type: application/json" \
 		-d '{"shots": $(SHOTS), "reason": "make grant-film"}'
 	@echo
+
+e2e: ## 로컬 스택(make up)에 대해 E2E 시나리오 실행 (bash + curl + jq)
+	API_BASE="$(API_BASE)" ADMIN_API_KEY="$(or $(ADMIN_API_KEY),local-admin-key)" ./scripts/e2e.sh
