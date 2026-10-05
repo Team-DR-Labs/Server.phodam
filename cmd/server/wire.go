@@ -60,7 +60,7 @@ func newPushSender(ctx context.Context, cfg config.Config, logger *slog.Logger) 
 		logger.Info("FCM_CREDENTIALS_FILE is empty; push notifications are logged only")
 		return push.NewLogSender(logger), nil
 	}
-	return push.NewFCMSender(ctx, cfg.Push.CredentialsFile)
+	return push.NewFCMSender(ctx, cfg.Push.CredentialsFile, logger)
 }
 
 // newAPI 는 /v1 아래 API 핸들러를 조립한다.

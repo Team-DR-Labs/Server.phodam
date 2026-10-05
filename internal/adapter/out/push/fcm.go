@@ -3,6 +3,7 @@ package push
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	firebase "firebase.google.com/go/v4"
 	"firebase.google.com/go/v4/messaging"
@@ -15,15 +16,19 @@ import (
 // fcmBatchLimit 은 멀티캐스트 한 번에 보낼 수 있는 최대 토큰 수다.
 const fcmBatchLimit = 500
 
+// androidChannelID 는 앱이 만드는 기본 알림 채널 ID 다(앱과 값을 맞춘다).
+const androidChannelID = "podam_default"
+
 // FCMSender 는 FCM HTTP v1 out.PushSender 구현체다.
 type FCMSender struct {
 	client *messaging.Client
+	logger *slog.Logger
 }
 
 var _ out.PushSender = (*FCMSender)(nil)
 
 // NewFCMSender 는 서비스 계정 JSON 파일로 FCM 클라이언트를 만든다.
-func NewFCMSender(ctx context.Context, credentialsFile string) (*FCMSender, error) {
+func NewFCMSender(ctx context.Context, credentialsFile string, logger *slog.Logger) (*FCMSender, error) {
 	app, err := firebase.NewApp(ctx, nil, option.WithAuthCredentialsFile(option.ServiceAccount, credentialsFile))
 	if err != nil {
 		return nil, fmt.Errorf("init firebase app: %w", err)
@@ -32,7 +37,7 @@ func NewFCMSender(ctx context.Context, credentialsFile string) (*FCMSender, erro
 	if err != nil {
 		return nil, fmt.Errorf("init fcm client: %w", err)
 	}
-	return &FCMSender{client: client}, nil
+	return &FCMSender{client: client, logger: logger}, nil
 }
 
 // Send 는 알림을 보내고 UNREGISTERED 응답을 받은 토큰을 돌려준다.
@@ -44,9 +49,21 @@ func (s *FCMSender) Send(ctx context.Context, tokens []string, msg push.Message)
 		if err != nil {
 			return invalid, fmt.Errorf("fcm send: %w", err)
 		}
+		s.logResult(ctx, msg, res)
 		invalid = append(invalid, unregistered(batch, res)...)
 	}
 	return invalid, nil
+}
+
+// logResult 는 발송 결과를 남긴다. 토큰 단위 실패는 Send 의 에러로 드러나지 않으므로 여기서 기록한다.
+func (s *FCMSender) logResult(ctx context.Context, msg push.Message, res *messaging.BatchResponse) {
+	s.logger.InfoContext(ctx, "fcm sent", slog.String("type", string(msg.Type)),
+		slog.Int("success", res.SuccessCount), slog.Int("failure", res.FailureCount))
+	for _, r := range res.Responses {
+		if r != nil && !r.Success {
+			s.logger.WarnContext(ctx, "fcm token send failed", slog.String("type", string(msg.Type)), slog.Any("error", r.Error))
+		}
+	}
 }
 
 func multicast(tokens []string, msg push.Message) *messaging.MulticastMessage {
@@ -54,6 +71,10 @@ func multicast(tokens []string, msg push.Message) *messaging.MulticastMessage {
 		Tokens:       tokens,
 		Data:         msg.Data(),
 		Notification: &messaging.Notification{Title: msg.Title, Body: msg.Body},
+		Android: &messaging.AndroidConfig{
+			Priority:     "high",
+			Notification: &messaging.AndroidNotification{ChannelID: androidChannelID},
+		},
 	}
 }
 
