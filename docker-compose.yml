@@ -1,4 +1,5 @@
 # 로컬 개발용 구성: postgres → liquibase(마이그레이션 1회 실행) → app
+#                 minio → minio-init(버킷 생성) → app
 # 값은 .env(선택)에서 읽고, 없으면 아래 기본값을 쓴다.
 name: phodam
 
@@ -35,10 +36,48 @@ services:
     # 로컬 전용: draft 와 committed 를 모두 적용한다. 공유 DB 에는 committed 만 적용할 것.
     command: ["update", "--contexts=draft,committed"]
 
+  minio:
+    # 공식 minio/minio 이미지는 Docker Hub 에서 내려갔으므로 소스 빌드 미러(alpine/minio)를 고정 태그로 쓴다.
+    image: alpine/minio:RELEASE.2025-10-15T17-29-55Z
+    # 이미지 기본 사용자는 named volume(/data, root 소유)에 쓸 수 없다. 로컬 전용이므로 root 로 실행한다.
+    user: "0:0"
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${STORAGE_ACCESS_KEY:-phodam}
+      MINIO_ROOT_PASSWORD: ${STORAGE_SECRET_KEY:-phodam-secret}
+    ports:
+      - "${STORAGE_EXPOSE_PORT:-9000}:9000"
+      - "${STORAGE_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9000/minio/health/live"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  # 버킷 두 개를 만든다 (이미 있으면 그대로 둔다). 새 버킷은 익명 접근이 없는 비공개 버킷이다.
+  # 공식 minio/mc 이미지 대신 chainguard/minio-client(엔트리포인트 mc, 셸 없음)를 쓴다.
+  minio-init:
+    image: chainguard/minio-client:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      HOME: /tmp
+      MC_HOST_local: http://${STORAGE_ACCESS_KEY:-phodam}:${STORAGE_SECRET_KEY:-phodam-secret}@minio:9000
+    command:
+      - mb
+      - --ignore-existing
+      - local/${STORAGE_TEMP_BUCKET:-phodam-temp}
+      - local/${STORAGE_PERMANENT_BUCKET:-phodam-permanent}
+
   app:
     build: .
     depends_on:
       liquibase:
+        condition: service_completed_successfully
+      minio-init:
         condition: service_completed_successfully
     environment:
       APP_ENV: ${APP_ENV:-local}
@@ -50,8 +89,25 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-phodam}
       DB_NAME: ${DB_NAME:-phodam}
       DB_SSLMODE: disable
+      JWT_SECRET: ${JWT_SECRET:-local-dev-jwt-secret-change-me-32bytes!!}
+      APPLE_CLIENT_IDS: ${APPLE_CLIENT_IDS:-}
+      GOOGLE_CLIENT_IDS: ${GOOGLE_CLIENT_IDS:-}
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-local-admin-key}
+      FCM_CREDENTIALS_FILE: ${FCM_CREDENTIALS_FILE:-}
+      WORKER_INTERVAL: ${WORKER_INTERVAL:-1m}
+      STORAGE_ENDPOINT: minio:9000
+      # presigned URL 은 앱(기기)이 접근할 호스트로 서명한다. 실기기/에뮬레이터는 PC 의 LAN IP 나 10.0.2.2 로 바꾼다.
+      STORAGE_PUBLIC_ENDPOINT: ${STORAGE_PUBLIC_ENDPOINT:-localhost:9000}
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-phodam}
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:-phodam-secret}
+      STORAGE_USE_SSL: "false"
+      STORAGE_PUBLIC_USE_SSL: ${STORAGE_PUBLIC_USE_SSL:-false}
+      STORAGE_REGION: us-east-1
+      STORAGE_TEMP_BUCKET: ${STORAGE_TEMP_BUCKET:-phodam-temp}
+      STORAGE_PERMANENT_BUCKET: ${STORAGE_PERMANENT_BUCKET:-phodam-permanent}
     ports:
       - "${APP_EXPOSE_PORT:-8080}:8080"
 
 volumes:
   postgres-data:
+  minio-data:

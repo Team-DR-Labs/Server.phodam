@@ -1,0 +1,783 @@
+openapi: 3.0.3
+info:
+  title: Phodam API
+  version: 0.1.0
+  description: |
+    포담 1차 MVP API. 동작 규칙은 docs/mvp-policy.md 를 따른다.
+    - 모든 시각은 RFC 3339 UTC.
+    - 에러는 ErrorResponse 이며 앱은 `code` 로만 분기한다. 명시되지 않은 상태는 default(주로 500 INTERNAL_ERROR).
+    - 남의 리소스·형식이 틀린 UUID 경로는 존재를 숨기기 위해 404 NOT_FOUND 로 응답한다.
+    - 커플이 없으면 커플 필요 엔드포인트는 403 COUPLE_REQUIRED.
+servers:
+  - url: http://localhost:8080/v1
+    description: local
+security:
+  - bearerAuth: []
+tags:
+  - name: auth
+  - name: me
+  - name: couple
+  - name: date
+  - name: photo
+  - name: diary
+  - name: admin
+
+paths:
+  /auth/apple:
+    post:
+      operationId: loginApple
+      tags: [auth]
+      summary: Apple 네이티브 로그인
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AppleLoginRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Auth' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /auth/google:
+    post:
+      operationId: loginGoogle
+      tags: [auth]
+      summary: Google 네이티브 로그인
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GoogleLoginRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Auth' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /auth/dev:
+    post:
+      operationId: loginDev
+      tags: [auth]
+      summary: 개발용 로그인 (APP_ENV=local 에서만 존재)
+      description: 같은 dev_id 로 다시 호출하면 같은 사용자로 로그인한다.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DevLoginRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Auth' }
+        '400': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /auth/refresh:
+    post:
+      operationId: refreshToken
+      tags: [auth]
+      summary: 토큰 갱신 (리프레시 토큰 회전)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Auth' }
+        '401': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: 로그아웃 (리프레시 토큰 폐기)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshRequest' }
+      responses:
+        '204': { description: 폐기 완료 (이미 폐기된 토큰도 204) }
+        '401': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /me:
+    get:
+      operationId: getMe
+      tags: [me]
+      summary: 내 상태 (프로필, 필름 잔량, 커플, 진행 중 데이트)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Me' }
+        '401': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+    patch:
+      operationId: updateMe
+      tags: [me]
+      summary: 닉네임 변경
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateMeRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Me' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /me/devices:
+    put:
+      operationId: registerDevice
+      tags: [me]
+      summary: FCM 기기 토큰 등록/갱신 (멱등)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeviceRequest' }
+      responses:
+        '204': { description: 등록 완료 }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /couple:
+    get:
+      operationId: getCouple
+      tags: [couple]
+      summary: 내 커플 조회
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Couple' }
+        '403': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /couple/invites:
+    post:
+      operationId: createInvite
+      tags: [couple]
+      summary: 초대 코드 발급 (이전 미사용 코드는 무효화)
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Invite' }
+        '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /couple/join:
+    post:
+      operationId: joinCouple
+      tags: [couple]
+      summary: 초대 코드로 연결
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/JoinCoupleRequest' }
+      responses:
+        '200':
+          description: 연결 완료
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Couple' }
+        '400': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /dates:
+    post:
+      operationId: startDate
+      tags: [date]
+      summary: 데이트 시작 (시작자는 즉시 주제 확인)
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DateView' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /dates/current:
+    get:
+      operationId: getCurrentDate
+      tags: [date]
+      summary: 진행 중 데이트 (없으면 204)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DateView' }
+        '204': { description: 진행 중 데이트 없음 }
+        '403': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /dates/{dateId}:
+    get:
+      operationId: getDate
+      tags: [date]
+      summary: 데이트 조회 (참여자만)
+      parameters: [ { $ref: '#/components/parameters/DateId' } ]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DateView' }
+        '404': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /dates/{dateId}/join:
+    post:
+      operationId: joinDate
+      tags: [date]
+      summary: 상대 참여 = 내 주제 확인 (멱등)
+      parameters: [ { $ref: '#/components/parameters/DateId' } ]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DateView' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /dates/{dateId}/shots:
+    post:
+      operationId: reserveShot
+      tags: [photo]
+      summary: 셔터 - 필름 1장 차감 + 업로드 URL 발급
+      parameters: [ { $ref: '#/components/parameters/DateId' } ]
+      responses:
+        '201':
+          description: 예약 완료
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShotReservation' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /dates/{dateId}/my-photos:
+    get:
+      operationId: listMyPhotos
+      tags: [photo]
+      summary: 이 데이트의 내 사진 (앱 내 미리보기 전용)
+      parameters: [ { $ref: '#/components/parameters/DateId' } ]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PhotoList' }
+        '404': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /dates/{dateId}/submit:
+    post:
+      operationId: submitDate
+      tags: [date]
+      summary: 대표 사진 + 글 제출 (수정 불가)
+      parameters: [ { $ref: '#/components/parameters/DateId' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SubmitRequest' }
+      responses:
+        '200':
+          description: 제출 완료
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DateView' }
+        '400': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /dates/{dateId}/receivable:
+    get:
+      operationId: getReceivable
+      tags: [photo]
+      summary: 수령 가능한 내 사진 (제출 후 7일)
+      parameters: [ { $ref: '#/components/parameters/DateId' } ]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Receivable' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /photos/{photoId}/upload-url:
+    post:
+      operationId: reissueUploadUrl
+      tags: [photo]
+      summary: reserved 사진의 업로드 URL 재발급
+      parameters: [ { $ref: '#/components/parameters/PhotoId' } ]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UploadTarget' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /photos/{photoId}/complete:
+    post:
+      operationId: completeUpload
+      tags: [photo]
+      summary: 업로드 완료 확인 (서버가 객체 존재 확인, 멱등)
+      parameters: [ { $ref: '#/components/parameters/PhotoId' } ]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Photo' }
+        '400': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /photos/{photoId}/received:
+    post:
+      operationId: ackReceived
+      tags: [photo]
+      summary: 기기 저장 성공 확인 (비대표는 서버 임시 파일 삭제, 멱등)
+      parameters: [ { $ref: '#/components/parameters/PhotoId' } ]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Photo' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /diaries:
+    get:
+      operationId: listDiaries
+      tags: [diary]
+      summary: 일기 목록 (started_at 내림차순)
+      parameters:
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DiaryList' }
+        '403': { $ref: '#/components/responses/Error' }
+        '400': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /diaries/{dateId}:
+    get:
+      operationId: getDiary
+      tags: [diary]
+      summary: 일기 상세
+      parameters: [ { $ref: '#/components/parameters/DateId' } ]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DiaryDetail' }
+        '404': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /admin/users/{userId}/film-grants:
+    post:
+      operationId: grantFilm
+      tags: [admin]
+      summary: 테스트용 필름 수동 지급
+      security:
+        - adminKey: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FilmGrantRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FilmGrantResponse' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    adminKey:
+      type: apiKey
+      in: header
+      name: X-Admin-Key
+
+  parameters:
+    DateId:
+      name: dateId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    PhotoId:
+      name: photoId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    Auth:
+      description: 로그인/갱신 성공
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AuthResponse' }
+    Error:
+      description: 에러
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  schemas:
+    ErrorCode:
+      type: string
+      enum:
+        - VALIDATION_FAILED
+        - UNAUTHORIZED
+        - AUTH_INVALID_ID_TOKEN
+        - AUTH_INVALID_REFRESH_TOKEN
+        - FORBIDDEN
+        - COUPLE_REQUIRED
+        - NOT_FOUND
+        - COUPLE_ALREADY_CONNECTED
+        - INVITE_INVALID
+        - DATE_ALREADY_IN_PROGRESS
+        - DATE_NOT_ACTIVE
+        - DATE_NOT_JOINED
+        - ALREADY_SUBMITTED
+        - FILM_EXHAUSTED
+        - PHOTO_NOT_UPLOADED
+        - PHOTO_INVALID
+        - RECEIVE_NOT_AVAILABLE
+        - INTERNAL_ERROR
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code: { $ref: '#/components/schemas/ErrorCode' }
+        message: { type: string }
+
+    # ---------- auth ----------
+    AppleLoginRequest:
+      type: object
+      required: [identity_token]
+      properties:
+        identity_token: { type: string, description: Apple identityToken (JWT) }
+        nickname:
+          type: string
+          nullable: true
+          maxLength: 20
+          description: 첫 로그인 시 Apple 이 준 이름 (이후 로그인엔 없음)
+    GoogleLoginRequest:
+      type: object
+      required: [id_token]
+      properties:
+        id_token: { type: string }
+    DevLoginRequest:
+      type: object
+      required: [dev_id]
+      properties:
+        dev_id: { type: string, minLength: 1, maxLength: 40, example: alice }
+        nickname: { type: string, nullable: true, maxLength: 20 }
+    RefreshRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token: { type: string }
+    AuthResponse:
+      type: object
+      required: [access_token, access_token_expires_at, refresh_token, refresh_token_expires_at, is_new_user, user]
+      properties:
+        access_token: { type: string }
+        access_token_expires_at: { type: string, format: date-time }
+        refresh_token: { type: string }
+        refresh_token_expires_at: { type: string, format: date-time }
+        is_new_user: { type: boolean }
+        user: { $ref: '#/components/schemas/User' }
+
+    # ---------- me ----------
+    User:
+      type: object
+      required: [id, nickname]
+      properties:
+        id: { type: string, format: uuid }
+        nickname: { type: string }
+    Me:
+      type: object
+      required: [user, film_balance, couple, current_date]
+      properties:
+        user: { $ref: '#/components/schemas/User' }
+        film_balance: { type: integer, minimum: 0, description: 남은 촬영 매수 }
+        couple:
+          type: object
+          nullable: true
+          allOf: [ { $ref: '#/components/schemas/Couple' } ]
+        current_date:
+          type: object
+          nullable: true
+          allOf: [ { $ref: '#/components/schemas/DateView' } ]
+    UpdateMeRequest:
+      type: object
+      required: [nickname]
+      properties:
+        nickname: { type: string, minLength: 1, maxLength: 20 }
+    DeviceRequest:
+      type: object
+      required: [fcm_token, platform]
+      properties:
+        fcm_token: { type: string }
+        platform: { type: string, enum: [ios, android] }
+
+    # ---------- couple ----------
+    Couple:
+      type: object
+      required: [id, partner, connected_at]
+      properties:
+        id: { type: string, format: uuid }
+        partner: { $ref: '#/components/schemas/User' }
+        connected_at: { type: string, format: date-time }
+    Invite:
+      type: object
+      required: [code, expires_at]
+      properties:
+        code: { type: string, example: K7QM2XPA }
+        expires_at: { type: string, format: date-time }
+    JoinCoupleRequest:
+      type: object
+      required: [code]
+      properties:
+        code: { type: string, minLength: 8, maxLength: 8 }
+
+    # ---------- date ----------
+    Theme:
+      type: object
+      required: [id, title]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string, example: 온기 }
+    Topic:
+      type: object
+      required: [id, title]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string, example: 따뜻한 색 }
+    DateStatus:
+      type: string
+      enum: [in_progress, revealed, expired]
+    ParticipantStatus:
+      type: string
+      enum: [assigned, joined, submitted]
+    MyParticipation:
+      type: object
+      required: [status, topic, joined_at, submitted_at, receive_deadline_at, shot_count]
+      properties:
+        status: { $ref: '#/components/schemas/ParticipantStatus' }
+        topic:
+          type: object
+          nullable: true
+          description: joined 이후에만 값이 있다
+          allOf: [ { $ref: '#/components/schemas/Topic' } ]
+        joined_at: { type: string, format: date-time, nullable: true }
+        submitted_at: { type: string, format: date-time, nullable: true }
+        receive_deadline_at: { type: string, format: date-time, nullable: true }
+        shot_count: { type: integer, description: 이 데이트에서 내가 예약한 샷 수 }
+    PartnerParticipation:
+      type: object
+      required: [user, status, topic]
+      properties:
+        user: { $ref: '#/components/schemas/User' }
+        status: { $ref: '#/components/schemas/ParticipantStatus' }
+        topic:
+          type: object
+          nullable: true
+          description: 데이트가 revealed 일 때만 값이 있다
+          allOf: [ { $ref: '#/components/schemas/Topic' } ]
+    DateView:
+      type: object
+      required: [id, status, theme, started_by_me, started_at, deadline_at, revealed_at, me, partner]
+      properties:
+        id: { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/DateStatus' }
+        theme: { $ref: '#/components/schemas/Theme' }
+        started_by_me: { type: boolean }
+        started_at: { type: string, format: date-time }
+        deadline_at: { type: string, format: date-time, description: started_at + 72h }
+        revealed_at: { type: string, format: date-time, nullable: true }
+        me: { $ref: '#/components/schemas/MyParticipation' }
+        partner: { $ref: '#/components/schemas/PartnerParticipation' }
+    SubmitRequest:
+      type: object
+      required: [photo_id]
+      properties:
+        photo_id: { type: string, format: uuid }
+        caption:
+          type: string
+          nullable: true
+          maxLength: 200
+          description: 앞뒤 공백 제거 후 최대 200자. 빈 문자열은 null 처리
+
+    # ---------- photo ----------
+    PhotoStatus:
+      type: string
+      enum: [reserved, uploaded, archived, received, deleted]
+    Photo:
+      type: object
+      required: [id, date_id, status, is_representative, created_at, uploaded_at, received_at]
+      properties:
+        id: { type: string, format: uuid }
+        date_id: { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/PhotoStatus' }
+        is_representative: { type: boolean }
+        created_at: { type: string, format: date-time }
+        uploaded_at: { type: string, format: date-time, nullable: true }
+        received_at: { type: string, format: date-time, nullable: true }
+    PhotoWithUrl:
+      allOf:
+        - $ref: '#/components/schemas/Photo'
+        - type: object
+          required: [url, url_expires_at]
+          properties:
+            url: { type: string, format: uri, description: presigned GET }
+            url_expires_at: { type: string, format: date-time }
+    PhotoList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/PhotoWithUrl' }
+    UploadTarget:
+      type: object
+      required: [url, method, headers, expires_at]
+      properties:
+        url: { type: string, format: uri, description: presigned PUT. 인증 헤더 없이 호출 }
+        method: { type: string, enum: [PUT] }
+        headers:
+          type: object
+          additionalProperties: { type: string }
+          example: { Content-Type: image/jpeg }
+        expires_at: { type: string, format: date-time }
+    ShotReservation:
+      type: object
+      required: [photo, upload, film_balance]
+      properties:
+        photo: { $ref: '#/components/schemas/Photo' }
+        upload: { $ref: '#/components/schemas/UploadTarget' }
+        film_balance: { type: integer, minimum: 0, description: 차감 후 잔량 }
+    Receivable:
+      type: object
+      required: [receive_deadline_at, items]
+      properties:
+        receive_deadline_at: { type: string, format: date-time }
+        items:
+          type: array
+          description: 미수령 비대표 사진 + 대표 사진(received_at 무관)
+          items: { $ref: '#/components/schemas/PhotoWithUrl' }
+
+    # ---------- diary ----------
+    DiaryVisibility:
+      type: string
+      enum: [shared, waiting, private]
+      description: shared=공동 공개, waiting=내가 제출하고 상대 대기 중, private=만료되어 나만 보는 기록
+    DiaryListItem:
+      type: object
+      required: [date_id, local_date, theme, visibility, started_at, thumbnail_url, thumbnail_url_expires_at]
+      properties:
+        date_id: { type: string, format: uuid }
+        local_date: { type: string, format: date, description: started_at 의 Asia/Seoul 날짜 }
+        theme: { $ref: '#/components/schemas/Theme' }
+        visibility: { $ref: '#/components/schemas/DiaryVisibility' }
+        started_at: { type: string, format: date-time }
+        thumbnail_url: { type: string, format: uri, description: 내 대표 사진 presigned GET }
+        thumbnail_url_expires_at: { type: string, format: date-time }
+    DiaryList:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/DiaryListItem' }
+        next_cursor: { type: string, nullable: true }
+    DiaryEntry:
+      type: object
+      required: [author, is_me, topic, caption, photo_url, photo_url_expires_at, submitted_at]
+      properties:
+        author: { $ref: '#/components/schemas/User' }
+        is_me: { type: boolean }
+        topic: { $ref: '#/components/schemas/Topic' }
+        caption: { type: string, nullable: true }
+        photo_url: { type: string, format: uri }
+        photo_url_expires_at: { type: string, format: date-time }
+        submitted_at: { type: string, format: date-time }
+    DiaryDetail:
+      type: object
+      required: [date_id, local_date, theme, visibility, started_at, entries]
+      properties:
+        date_id: { type: string, format: uuid }
+        local_date: { type: string, format: date }
+        theme: { $ref: '#/components/schemas/Theme' }
+        visibility: { $ref: '#/components/schemas/DiaryVisibility' }
+        started_at: { type: string, format: date-time }
+        entries:
+          type: array
+          description: shared 면 2개(내 것 먼저), 그 외에는 내 것 1개
+          items: { $ref: '#/components/schemas/DiaryEntry' }
+
+    # ---------- admin ----------
+    FilmGrantRequest:
+      type: object
+      required: [shots]
+      properties:
+        shots: { type: integer, minimum: 1, maximum: 240, example: 24 }
+        reason: { type: string, nullable: true, maxLength: 100 }
+    FilmGrantResponse:
+      type: object
+      required: [user_id, film_balance]
+      properties:
+        user_id: { type: string, format: uuid }
+        film_balance: { type: integer }

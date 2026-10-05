@@ -28,6 +28,25 @@ func NewRouter(logger *slog.Logger, handlers ...Handler) *gin.Engine {
 	return r
 }
 
+// Group 은 prefix 아래에 여러 핸들러를 등록하는 Handler 다 (예: /v1).
+type Group struct {
+	prefix   string
+	handlers []Handler
+}
+
+// NewGroup 은 Group 을 생성한다.
+func NewGroup(prefix string, handlers ...Handler) Group {
+	return Group{prefix: prefix, handlers: handlers}
+}
+
+// Register 는 prefix 그룹에 핸들러 라우트를 등록한다.
+func (g Group) Register(r gin.IRouter) {
+	sub := r.Group(g.prefix)
+	for _, h := range g.handlers {
+		h.Register(sub)
+	}
+}
+
 func requestLogger(logger *slog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()

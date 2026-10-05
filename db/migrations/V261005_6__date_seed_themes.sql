@@ -1,0 +1,50 @@
+--liquibase formatted sql
+
+--changeset phodam:V261005_6_1 context:committed
+--comment: 테마 10개와 주제 시드 (데이트 중 찍기 좋은 따뜻한 주제)
+INSERT INTO themes (title, sort_order) VALUES ('온기', 1);
+INSERT INTO themes (title, sort_order) VALUES ('빛', 2);
+INSERT INTO themes (title, sort_order) VALUES ('오늘의 색', 3);
+INSERT INTO themes (title, sort_order) VALUES ('작은 것들', 4);
+INSERT INTO themes (title, sort_order) VALUES ('맛', 5);
+INSERT INTO themes (title, sort_order) VALUES ('길', 6);
+INSERT INTO themes (title, sort_order) VALUES ('하늘', 7);
+INSERT INTO themes (title, sort_order) VALUES ('소리', 8);
+INSERT INTO themes (title, sort_order) VALUES ('우리', 9);
+INSERT INTO themes (title, sort_order) VALUES ('처음', 10);
+INSERT INTO topics (theme_id, title, sort_order) SELECT id, '따뜻한 색', 1 FROM themes WHERE title = '온기';
+INSERT INTO topics (theme_id, title, sort_order) SELECT id, '마음이 편해지는 장면', 2 FROM themes WHERE title = '온기';
+INSERT INTO topics (theme_id, title, sort_order) SELECT id, '손끝의 온도', 3 FROM themes WHERE title = '온기';
+INSERT INTO topics (theme_id, title, sort_order) SELECT id, '김이 피어오르는 것', 4 FROM themes WHERE title = '온기';
+INSERT INTO topics (theme_id, title, sort_order) SELECT id, '창가로 드는 빛', 1 FROM themes WHERE title = '빛';
+INSERT INTO topics (theme_id, title, sort_order) SELECT id, '반짝이는 것', 2 FROM themes WHERE title = '빛';
+INSERT INTO topics (theme_id, title, sort_order) SELECT id, '그림자가 예쁜 곳', 3 FROM themes WHERE title = '빛';
+INSERT INTO topics (theme_id, title, sort_order) SELECT id, '오늘 가장 많이 본 색', 1 FROM themes WHERE title = '오늘의 색';
+INSERT INTO topics (theme_id, title, sort_order) SELECT id, '상대의 옷과 닮은 색', 2 FROM themes WHERE title = '오늘의 색';
+INSERT INTO topics (theme_id, title, sort_order) SELECT id, '의외의 색 조합', 3 FROM themes WHERE title = '오늘의 색';
+INSERT INTO topics (theme_id, title, sort_order) SELECT id, '손바닥보다 작은 것', 1 FROM themes WHERE title = '작은 것들';
+INSERT INTO topics (theme_id, title, sort_order) SELECT id, '지나치기 쉬운 귀여운 것', 2 FROM themes WHERE title = '작은 것들';
+INSERT INTO topics (theme_id, title, sort_order) SELECT id, '발밑의 풍경', 3 FROM themes WHERE title = '작은 것들';
+INSERT INTO topics (theme_id, title, sort_order) SELECT id, '주머니 속 물건', 4 FROM themes WHERE title = '작은 것들';
+INSERT INTO topics (theme_id, title, sort_order) SELECT id, '함께 먹은 첫 입', 1 FROM themes WHERE title = '맛';
+INSERT INTO topics (theme_id, title, sort_order) SELECT id, '달콤한 순간', 2 FROM themes WHERE title = '맛';
+INSERT INTO topics (theme_id, title, sort_order) SELECT id, '테이블 위의 풍경', 3 FROM themes WHERE title = '맛';
+INSERT INTO topics (theme_id, title, sort_order) SELECT id, '함께 걸은 길', 1 FROM themes WHERE title = '길';
+INSERT INTO topics (theme_id, title, sort_order) SELECT id, '뒤돌아본 풍경', 2 FROM themes WHERE title = '길';
+INSERT INTO topics (theme_id, title, sort_order) SELECT id, '가 보고 싶은 골목', 3 FROM themes WHERE title = '길';
+INSERT INTO topics (theme_id, title, sort_order) SELECT id, '길 위의 표지판', 4 FROM themes WHERE title = '길';
+INSERT INTO topics (theme_id, title, sort_order) SELECT id, '올려다본 하늘', 1 FROM themes WHERE title = '하늘';
+INSERT INTO topics (theme_id, title, sort_order) SELECT id, '구름의 모양', 2 FROM themes WHERE title = '하늘';
+INSERT INTO topics (theme_id, title, sort_order) SELECT id, '해 질 무렵', 3 FROM themes WHERE title = '하늘';
+INSERT INTO topics (theme_id, title, sort_order) SELECT id, '소리가 들리는 사진', 1 FROM themes WHERE title = '소리';
+INSERT INTO topics (theme_id, title, sort_order) SELECT id, '조용한 곳', 2 FROM themes WHERE title = '소리';
+INSERT INTO topics (theme_id, title, sort_order) SELECT id, '음악이 떠오르는 장면', 3 FROM themes WHERE title = '소리';
+INSERT INTO topics (theme_id, title, sort_order) SELECT id, '둘이 함께 만든 것', 1 FROM themes WHERE title = '우리';
+INSERT INTO topics (theme_id, title, sort_order) SELECT id, '상대가 웃는 이유', 2 FROM themes WHERE title = '우리';
+INSERT INTO topics (theme_id, title, sort_order) SELECT id, '닮은 두 개', 3 FROM themes WHERE title = '우리';
+INSERT INTO topics (theme_id, title, sort_order) SELECT id, '오늘의 기념품', 4 FROM themes WHERE title = '우리';
+INSERT INTO topics (theme_id, title, sort_order) SELECT id, '처음 가 본 곳', 1 FROM themes WHERE title = '처음';
+INSERT INTO topics (theme_id, title, sort_order) SELECT id, '처음 보는 것', 2 FROM themes WHERE title = '처음';
+INSERT INTO topics (theme_id, title, sort_order) SELECT id, '오늘 처음 웃은 순간', 3 FROM themes WHERE title = '처음';
+--rollback DELETE FROM topics WHERE theme_id IN (SELECT id FROM themes WHERE title IN ('온기', '빛', '오늘의 색', '작은 것들', '맛', '길', '하늘', '소리', '우리', '처음'));
+--rollback DELETE FROM themes WHERE title IN ('온기', '빛', '오늘의 색', '작은 것들', '맛', '길', '하늘', '소리', '우리', '처음');
