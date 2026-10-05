@@ -39,6 +39,8 @@ func TestCouple_InviteAndJoin(t *testing.T) {
 
 	_, err = svc.CreateInvite(ctx, a)
 	wantCode(t, err, apperr.CoupleAlreadyConnected)
+	_, err = svc.Join(ctx, b, inv.Code)
+	wantCode(t, err, apperr.CoupleAlreadyConnected)
 }
 
 func TestCouple_JoinRejections(t *testing.T) {

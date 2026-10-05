@@ -74,8 +74,13 @@ func run(logger *slog.Logger) error {
 		workers.Wait()
 	}()
 
+	return serve(ctx, cfg.App, router, logger)
+}
+
+// serve 는 HTTP 서버를 띄우고 ctx 가 끝나면 ShutdownTimeout 안에 정상 종료한다.
+func serve(ctx context.Context, cfg config.AppConfig, router http.Handler, logger *slog.Logger) error {
 	srv := &http.Server{
-		Addr:              ":" + strconv.Itoa(cfg.App.Port),
+		Addr:              ":" + strconv.Itoa(cfg.Port),
 		Handler:           router,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
@@ -85,7 +90,7 @@ func run(logger *slog.Logger) error {
 
 	errCh := make(chan error, 1)
 	go func() {
-		logger.Info("http server started", slog.String("addr", srv.Addr), slog.String("env", cfg.App.Env))
+		logger.Info("http server started", slog.String("addr", srv.Addr), slog.String("env", cfg.Env))
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}
@@ -99,7 +104,7 @@ func run(logger *slog.Logger) error {
 	}
 
 	logger.Info("shutting down")
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.App.ShutdownTimeout)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		return fmt.Errorf("shutdown http server: %w", err)

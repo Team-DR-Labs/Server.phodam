@@ -89,6 +89,10 @@ func (s *CoupleService) Join(ctx context.Context, userID uuid.UUID, rawCode stri
 func (s *CoupleService) join(ctx context.Context, userID uuid.UUID, code string) (couple.Couple, error) {
 	invalid := apperr.New(apperr.InviteInvalid, "invite code is invalid")
 	now := s.d.now()
+	// 이미 연결된 사용자는 코드 상태와 관계없이 COUPLE_ALREADY_CONNECTED 다.
+	if err := s.ensureSingle(ctx, userID); err != nil {
+		return couple.Couple{}, err
+	}
 	inv, err := s.d.Invites.FindByCodeForUpdate(ctx, code)
 	if errors.Is(err, out.ErrNotFound) {
 		return couple.Couple{}, invalid
