@@ -92,7 +92,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:-local-dev-jwt-secret-change-me-32bytes!!}
       APPLE_CLIENT_IDS: ${APPLE_CLIENT_IDS:-}
       GOOGLE_CLIENT_IDS: ${GOOGLE_CLIENT_IDS:-}
-      ADMIN_API_KEY: ${ADMIN_API_KEY:-}
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-local-admin-key}
       FCM_CREDENTIALS_FILE: ${FCM_CREDENTIALS_FILE:-}
       WORKER_INTERVAL: ${WORKER_INTERVAL:-1m}
       STORAGE_ENDPOINT: minio:9000
