@@ -11,6 +11,8 @@ var (
 	ErrNotFound = errors.New("not found")
 	// ErrDuplicate 는 유니크 제약 위반이다.
 	ErrDuplicate = errors.New("duplicate")
+	// ErrInvalidIDToken 은 외부 ID 토큰의 서명·클레임 검증 실패다. 설정·네트워크 오류와 구분한다.
+	ErrInvalidIDToken = errors.New("invalid id token")
 	// ErrObjectNotFound 는 오브젝트 스토리지에 객체가 없을 때 반환한다.
 	ErrObjectNotFound = errors.New("object not found")
 )

@@ -73,8 +73,8 @@ func (h *DiaryHandler) list(c *gin.Context) {
 	limit := 0
 	if raw := c.Query("limit"); raw != "" {
 		n, err := strconv.Atoi(raw)
-		if err != nil {
-			h.ew.validation(c, "limit must be an integer")
+		if err != nil || n < 1 {
+			h.ew.validation(c, "limit must be 1-50")
 			return
 		}
 		limit = n

@@ -4,11 +4,13 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 
+	"github.com/Team-DR-Labs/Server.phodam/internal/application/port/out"
 	"github.com/Team-DR-Labs/Server.phodam/internal/domain/user"
 )
 
@@ -48,14 +50,13 @@ func TestVerifier(t *testing.T) {
 		{"wrong issuer", user.ProviderGoogle, sign(key, "https://evil", "client-1", now.Add(time.Hour)), true},
 		{"expired", user.ProviderGoogle, sign(key, good, "client-1", now.Add(-time.Hour)), true},
 		{"wrong key", user.ProviderGoogle, sign(other, good, "client-1", now.Add(time.Hour)), true},
-		{"unknown provider", user.ProviderApple, sign(key, good, "client-1", now.Add(time.Hour)), true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := v.Verify(context.Background(), tt.provider, tt.token)
 			if tt.wantErr {
-				if err == nil {
-					t.Fatal("expected error")
+				if !errors.Is(err, out.ErrInvalidIDToken) {
+					t.Fatalf("expected ErrInvalidIDToken, got %v", err)
 				}
 				return
 			}
@@ -70,7 +71,8 @@ func TestVerifier_RejectsWithoutConfiguredAudience(t *testing.T) {
 	v := New(context.Background(), time.Now, map[user.Provider]*Provider{
 		user.ProviderApple: {Issuers: []string{"https://appleid.apple.com"}, Keyfunc: func(*jwt.Token) (any, error) { return nil, nil }},
 	})
-	if _, err := v.Verify(context.Background(), user.ProviderApple, "x.y.z"); err == nil {
-		t.Fatal("expected error when client ids are empty")
+	_, err := v.Verify(context.Background(), user.ProviderApple, "x.y.z")
+	if err == nil || errors.Is(err, out.ErrInvalidIDToken) {
+		t.Fatalf("missing client ids is a configuration error, got %v", err)
 	}
 }

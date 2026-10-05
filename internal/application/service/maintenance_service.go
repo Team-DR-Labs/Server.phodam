@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"time"
 
 	"github.com/Team-DR-Labs/Server.phodam/internal/application/port/in"
 	"github.com/Team-DR-Labs/Server.phodam/internal/application/port/out"
@@ -58,46 +57,35 @@ func (s *MaintenanceService) expireDates(ctx context.Context) error {
 
 // purgeExpiredPhotos 는 만료된 데이트에서 미제출 참여자의 reserved/uploaded 사진을 지운다.
 func (s *MaintenanceService) purgeExpiredPhotos(ctx context.Context) error {
-	return s.purgePhotos(ctx, func(ctx context.Context) ([]photo.Photo, error) {
-		return s.d.Photos.LockExpiredLeftovers(ctx, maintenanceBatch)
-	})
+	photos, err := s.d.Photos.ListExpiredLeftovers(ctx, maintenanceBatch)
+	if err != nil {
+		return fmt.Errorf("list expired leftovers: %w", err)
+	}
+	return s.purgePhotos(ctx, photos, photo.StatusReserved, photo.StatusUploaded)
 }
 
 // purgeReceiveOverdue 는 수령 기한이 지난 uploaded 비대표 사진을 지운다. archived 는 지우지 않는다.
 func (s *MaintenanceService) purgeReceiveOverdue(ctx context.Context) error {
-	now := s.d.now()
-	return s.purgePhotos(ctx, func(ctx context.Context) ([]photo.Photo, error) {
-		return s.d.Photos.LockReceiveOverdue(ctx, now, maintenanceBatch)
-	})
+	photos, err := s.d.Photos.ListReceiveOverdue(ctx, s.d.now(), maintenanceBatch)
+	if err != nil {
+		return fmt.Errorf("list receive overdue: %w", err)
+	}
+	return s.purgePhotos(ctx, photos, photo.StatusUploaded)
 }
 
-// purgePhotos 는 잠근 사진들의 temp 객체를 지우고 deleted 로 바꾼다.
-// 객체 삭제에 실패한 사진은 상태를 바꾸지 않아 다음 주기에 다시 시도된다.
-func (s *MaintenanceService) purgePhotos(ctx context.Context, lock func(context.Context) ([]photo.Photo, error)) error {
-	return s.d.Tx.WithinTx(ctx, func(ctx context.Context) error {
-		photos, err := lock(ctx)
-		if err != nil {
-			return fmt.Errorf("lock photos: %w", err)
+// purgePhotos 는 temp 객체를 지우고, 그동안 상태가 바뀌지 않은 사진만 deleted 로 바꾼다.
+// 객체 삭제는 DB 잠금 밖에서 한다. 삭제에 실패한 사진은 상태를 바꾸지 않아 다음 주기에 다시 시도된다.
+func (s *MaintenanceService) purgePhotos(ctx context.Context, photos []photo.Photo, from ...photo.Status) error {
+	for _, p := range photos {
+		if err := s.d.Storage.Remove(ctx, out.BucketTemp, p.TempKey); err != nil {
+			s.d.Logger.WarnContext(ctx, "remove photo object", slog.String("photo_id", p.ID.String()), slog.Any("error", err))
+			continue
 		}
-		now := s.d.now()
-		for _, p := range photos {
-			if err := s.d.Storage.Remove(ctx, out.BucketTemp, p.TempKey); err != nil {
-				s.d.Logger.WarnContext(ctx, "remove photo object", slog.String("photo_id", p.ID.String()), slog.Any("error", err))
-				continue
-			}
-			if err := s.d.Photos.Update(ctx, markDeleted(p, now)); err != nil {
-				return fmt.Errorf("mark photo deleted: %w", err)
-			}
+		if _, err := s.d.Photos.MarkDeleted(ctx, p.ID, s.d.now(), from...); err != nil {
+			return fmt.Errorf("mark photo deleted: %w", err)
 		}
-		return nil
-	})
-}
-
-func markDeleted(p photo.Photo, now time.Time) photo.Photo {
-	next := p
-	next.Status = photo.StatusDeleted
-	next.DeletedAt = &now
-	return next
+	}
+	return nil
 }
 
 // remindDeadline 은 마감 6시간 전 미제출 참여자에게 한 번만 알림을 보낸다.
@@ -121,21 +109,18 @@ func (s *MaintenanceService) remindDeadline(ctx context.Context) error {
 
 // purgeArchivedTemp 는 대표 사진의 temp 사본이 남아 있으면 다시 지운다.
 func (s *MaintenanceService) purgeArchivedTemp(ctx context.Context) error {
-	return s.d.Tx.WithinTx(ctx, func(ctx context.Context) error {
-		photos, err := s.d.Photos.LockArchivedWithTemp(ctx, maintenanceBatch)
-		if err != nil {
-			return fmt.Errorf("lock archived photos: %w", err)
+	photos, err := s.d.Photos.ListArchivedWithTemp(ctx, maintenanceBatch)
+	if err != nil {
+		return fmt.Errorf("list archived photos: %w", err)
+	}
+	for _, p := range photos {
+		if err := s.d.Storage.Remove(ctx, out.BucketTemp, p.TempKey); err != nil {
+			s.d.Logger.WarnContext(ctx, "remove archived temp", slog.String("photo_id", p.ID.String()), slog.Any("error", err))
+			continue
 		}
-		now := s.d.now()
-		for _, p := range photos {
-			if err := s.d.Storage.Remove(ctx, out.BucketTemp, p.TempKey); err != nil {
-				s.d.Logger.WarnContext(ctx, "remove archived temp", slog.String("photo_id", p.ID.String()), slog.Any("error", err))
-				continue
-			}
-			if err := s.d.Photos.MarkTempPurged(ctx, p.ID, now); err != nil {
-				return fmt.Errorf("mark temp purged: %w", err)
-			}
+		if err := s.d.Photos.MarkTempPurged(ctx, p.ID, s.d.now()); err != nil {
+			return fmt.Errorf("mark temp purged: %w", err)
 		}
-		return nil
-	})
+	}
+	return nil
 }

@@ -577,6 +577,18 @@ func (f fakePhotos) MarkTempPurged(_ context.Context, id uuid.UUID, now time.Tim
 	return nil
 }
 
+func (f fakePhotos) MarkDeleted(_ context.Context, id uuid.UUID, now time.Time, from ...photo.Status) (bool, error) {
+	f.s.mu.Lock()
+	defer f.s.mu.Unlock()
+	p, ok := f.s.photos[id]
+	if !ok || !slices.Contains(from, p.Status) {
+		return false, nil
+	}
+	p.Status, p.DeletedAt = photo.StatusDeleted, &now
+	f.s.photos[id] = p
+	return true, nil
+}
+
 func (f fakePhotos) selectPhotos(limit int, keep func(photo.Photo, dating.Date) bool) []photo.Photo {
 	f.s.mu.Lock()
 	defer f.s.mu.Unlock()
@@ -592,7 +604,7 @@ func (f fakePhotos) selectPhotos(limit int, keep func(photo.Photo, dating.Date) 
 	return res
 }
 
-func (f fakePhotos) LockExpiredLeftovers(_ context.Context, limit int) ([]photo.Photo, error) {
+func (f fakePhotos) ListExpiredLeftovers(_ context.Context, limit int) ([]photo.Photo, error) {
 	return f.selectPhotos(limit, func(p photo.Photo, d dating.Date) bool {
 		me, _ := d.Participant(p.OwnerID)
 		live := p.Status == photo.StatusReserved || p.Status == photo.StatusUploaded
@@ -600,7 +612,7 @@ func (f fakePhotos) LockExpiredLeftovers(_ context.Context, limit int) ([]photo.
 	}), nil
 }
 
-func (f fakePhotos) LockReceiveOverdue(_ context.Context, now time.Time, limit int) ([]photo.Photo, error) {
+func (f fakePhotos) ListReceiveOverdue(_ context.Context, now time.Time, limit int) ([]photo.Photo, error) {
 	return f.selectPhotos(limit, func(p photo.Photo, d dating.Date) bool {
 		me, _ := d.Participant(p.OwnerID)
 		overdue := me.ReceiveDeadlineAt != nil && !now.Before(*me.ReceiveDeadlineAt)
@@ -608,7 +620,7 @@ func (f fakePhotos) LockReceiveOverdue(_ context.Context, now time.Time, limit i
 	}), nil
 }
 
-func (f fakePhotos) LockArchivedWithTemp(_ context.Context, limit int) ([]photo.Photo, error) {
+func (f fakePhotos) ListArchivedWithTemp(_ context.Context, limit int) ([]photo.Photo, error) {
 	return f.selectPhotos(limit, func(p photo.Photo, _ dating.Date) bool {
 		return p.Status == photo.StatusArchived && p.TempPurgedAt == nil
 	}), nil
@@ -711,9 +723,12 @@ func (f *fakePush) typesTo(token string) []push.Type {
 type fakeVerifier struct{ claims map[string]out.IDTokenClaims }
 
 func (f fakeVerifier) Verify(_ context.Context, _ user.Provider, token string) (out.IDTokenClaims, error) {
+	if token == "config-error" {
+		return out.IDTokenClaims{}, errors.New("client ids not configured")
+	}
 	c, ok := f.claims[token]
 	if !ok {
-		return out.IDTokenClaims{}, errors.New("bad token")
+		return out.IDTokenClaims{}, out.ErrInvalidIDToken
 	}
 	return c, nil
 }

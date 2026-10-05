@@ -62,10 +62,15 @@ type WorkerConfig struct {
 }
 
 // IsLocal 은 로컬 개발 환경인지 반환한다 (dev 로그인 라우트 등록 조건).
+// APP_ENV 가 없으면 production 으로 보므로 dev 로그인은 명시적으로 local 일 때만 열린다.
 func (c AppConfig) IsLocal() bool { return c.Env == "local" }
 
-// minJWTSecretLen 은 HS256 키 최소 길이다.
-const minJWTSecretLen = 32
+const (
+	// minJWTSecretLen 은 HS256 키 최소 길이다.
+	minJWTSecretLen = 32
+	// minAdminKeyLen 은 local 이 아닌 환경의 관리자 키 최소 길이다.
+	minAdminKeyLen = 32
+)
 
 // AppConfig 는 HTTP 서버 설정이다.
 type AppConfig struct {
@@ -103,7 +108,7 @@ func Load() (Config, error) {
 
 	cfg := Config{
 		App: AppConfig{
-			Env:             r.str("APP_ENV", "local"),
+			Env:             r.str("APP_ENV", "production"),
 			Port:            r.int("APP_PORT", 8080),
 			GinMode:         r.str("GIN_MODE", "release"),
 			ShutdownTimeout: r.duration("APP_SHUTDOWN_TIMEOUT", 10*time.Second),
@@ -158,6 +163,9 @@ func loadStorage(r *reader) StorageConfig {
 func (r *reader) validate(cfg Config) {
 	if s := cfg.Auth.JWTSecret; s != "" && len(s) < minJWTSecretLen {
 		r.errs = append(r.errs, fmt.Errorf("JWT_SECRET must be at least %d bytes", minJWTSecretLen))
+	}
+	if k := cfg.Admin.APIKey; k != "" && !cfg.App.IsLocal() && len(k) < minAdminKeyLen {
+		r.errs = append(r.errs, fmt.Errorf("ADMIN_API_KEY must be at least %d bytes outside local", minAdminKeyLen))
 	}
 	if cfg.Worker.Interval <= 0 {
 		r.errs = append(r.errs, errors.New("WORKER_INTERVAL must be positive"))

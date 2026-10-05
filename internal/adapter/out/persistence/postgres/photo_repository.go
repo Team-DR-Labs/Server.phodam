@@ -133,31 +133,38 @@ func (r *PhotoRepository) MarkTempPurged(ctx context.Context, id uuid.UUID, now 
 	return conn(ctx, r.db).Model(&photoModel{}).Where("id = ?", id).Update("temp_purged_at", now).Error
 }
 
-// LockExpiredLeftovers 는 만료 데이트에서 미제출 참여자의 reserved/uploaded 사진을 잠근다.
-func (r *PhotoRepository) LockExpiredLeftovers(ctx context.Context, limit int) ([]photo.Photo, error) {
-	return r.lock(ctx, `SELECT ph.* FROM photos ph
+// MarkDeleted 는 from 상태일 때만 deleted 로 바꾼다.
+func (r *PhotoRepository) MarkDeleted(ctx context.Context, id uuid.UUID, now time.Time, from ...photo.Status) (bool, error) {
+	res := conn(ctx, r.db).Model(&photoModel{}).Where("id = ? AND status IN ?", id, statusStrings(from)).
+		Updates(map[string]any{"status": string(photo.StatusDeleted), "deleted_at": now})
+	return res.RowsAffected > 0, res.Error
+}
+
+// ListExpiredLeftovers 는 만료 데이트에서 미제출 참여자의 reserved/uploaded 사진이다.
+func (r *PhotoRepository) ListExpiredLeftovers(ctx context.Context, limit int) ([]photo.Photo, error) {
+	return r.query(ctx, `SELECT ph.* FROM photos ph
 		JOIN dates d ON d.id = ph.date_id
 		JOIN date_participants p ON p.date_id = ph.date_id AND p.user_id = ph.owner_id
 		WHERE d.status = 'expired' AND p.status <> 'submitted' AND ph.status IN ('reserved', 'uploaded')
-		ORDER BY ph.created_at LIMIT ? FOR UPDATE OF ph SKIP LOCKED`, limit)
+		ORDER BY ph.created_at LIMIT ?`, limit)
 }
 
-// LockReceiveOverdue 는 수령 기한이 지난 uploaded 비대표 사진을 잠근다.
-func (r *PhotoRepository) LockReceiveOverdue(ctx context.Context, now time.Time, limit int) ([]photo.Photo, error) {
-	return r.lock(ctx, `SELECT ph.* FROM photos ph
+// ListReceiveOverdue 는 수령 기한이 지난 uploaded 비대표 사진이다.
+func (r *PhotoRepository) ListReceiveOverdue(ctx context.Context, now time.Time, limit int) ([]photo.Photo, error) {
+	return r.query(ctx, `SELECT ph.* FROM photos ph
 		JOIN date_participants p ON p.date_id = ph.date_id AND p.user_id = ph.owner_id
 		WHERE p.status = 'submitted' AND p.receive_deadline_at <= ?
 		  AND ph.status = 'uploaded' AND ph.is_representative = false
-		ORDER BY ph.created_at LIMIT ? FOR UPDATE OF ph SKIP LOCKED`, now, limit)
+		ORDER BY ph.created_at LIMIT ?`, now, limit)
 }
 
-// LockArchivedWithTemp 는 temp 사본이 남은 대표 사진을 잠근다.
-func (r *PhotoRepository) LockArchivedWithTemp(ctx context.Context, limit int) ([]photo.Photo, error) {
-	return r.lock(ctx, `SELECT * FROM photos WHERE status = 'archived' AND temp_purged_at IS NULL
-		ORDER BY created_at LIMIT ? FOR UPDATE SKIP LOCKED`, limit)
+// ListArchivedWithTemp 는 temp 사본이 남은 대표 사진이다.
+func (r *PhotoRepository) ListArchivedWithTemp(ctx context.Context, limit int) ([]photo.Photo, error) {
+	return r.query(ctx, `SELECT * FROM photos WHERE status = 'archived' AND temp_purged_at IS NULL
+		ORDER BY created_at LIMIT ?`, limit)
 }
 
-func (r *PhotoRepository) lock(ctx context.Context, query string, args ...any) ([]photo.Photo, error) {
+func (r *PhotoRepository) query(ctx context.Context, query string, args ...any) ([]photo.Photo, error) {
 	var rows []photoModel
 	if err := conn(ctx, r.db).Raw(query, args...).Scan(&rows).Error; err != nil {
 		return nil, err

@@ -74,8 +74,12 @@ func (s *AuthService) verify(ctx context.Context, p user.Provider, token string)
 		return out.IDTokenClaims{}, errValidation("id token is required")
 	}
 	claims, err := s.d.IDTokens.Verify(ctx, p, token)
-	if err != nil || claims.Subject == "" {
+	if errors.Is(err, out.ErrInvalidIDToken) || (err == nil && claims.Subject == "") {
 		return out.IDTokenClaims{}, apperr.New(apperr.AuthInvalidIDToken, "invalid id token")
+	}
+	if err != nil {
+		// 클라이언트 ID 미설정, JWKS 조회 실패 같은 서버 쪽 문제다.
+		return out.IDTokenClaims{}, fmt.Errorf("verify %s id token: %w", p, err)
 	}
 	return claims, nil
 }

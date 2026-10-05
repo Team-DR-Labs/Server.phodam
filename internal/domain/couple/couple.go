@@ -4,6 +4,7 @@ package couple
 import (
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 )
@@ -54,16 +55,11 @@ func (i Invite) UsableAt(now time.Time) bool {
 }
 
 // NormalizeCode 는 사용자가 입력한 코드의 공백을 지우고 대문자로 바꾼다.
-// 형식이 맞지 않으면 false 를 반환한다.
+// 길이가 맞지 않으면 false 다. 문자 집합 밖의 문자는 존재하지 않는 코드로 조회 단계에서 걸러진다.
 func NormalizeCode(raw string) (string, bool) {
 	code := strings.ToUpper(strings.TrimSpace(raw))
-	if len(code) != InviteCodeLength {
+	if utf8.RuneCountInString(code) != InviteCodeLength {
 		return "", false
-	}
-	for _, r := range code {
-		if !strings.ContainsRune(InviteCodeAlphabet, r) {
-			return "", false
-		}
 	}
 	return code, true
 }

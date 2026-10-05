@@ -73,6 +73,10 @@ func TestAuth_Errors(t *testing.T) {
 
 	_, err := svc.LoginApple(ctx, "forged", nil)
 	wantCode(t, err, apperr.AuthInvalidIDToken)
+	_, err = svc.LoginGoogle(ctx, "config-error")
+	if _, isDomain := apperr.As(err); err == nil || isDomain {
+		t.Fatalf("server-side verifier failure must be internal, got %v", err)
+	}
 	_, err = svc.LoginDev(ctx, "", nil)
 	wantCode(t, err, apperr.ValidationFailed)
 	_, err = svc.LoginDev(ctx, "bob", ptr(strings.Repeat("가", 21)))

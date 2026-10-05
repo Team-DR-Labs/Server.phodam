@@ -37,6 +37,9 @@ func (s *DateService) Submit(ctx context.Context, userID, dateID, photoID uuid.U
 	if err != nil {
 		return dating.View{}, err
 	}
+	if err := s.verifyObject(ctx, rep); err != nil {
+		return dating.View{}, err
+	}
 	permKey := photo.PermanentKey(rep.DateID, rep.OwnerID, rep.ID)
 	if err := s.d.Storage.Copy(ctx, out.BucketTemp, rep.TempKey, out.BucketPermanent, permKey); err != nil {
 		return dating.View{}, fmt.Errorf("copy to permanent: %w", err)
@@ -99,11 +102,12 @@ func (s *DateService) submitTx(ctx context.Context, userID, dateID, photoID uuid
 	if err != nil {
 		return submitResult{}, err
 	}
-	p, err := s.loadRepresentative(ctx, userID, dateID, photoID, true)
+	// 동시 제출에서 두 번째 요청이 ALREADY_SUBMITTED 를 받도록 데이트 조건을 먼저 본다.
+	next, revealed, err := d.Submit(userID, photoID, caption, now)
 	if err != nil {
 		return submitResult{}, err
 	}
-	next, revealed, err := d.Submit(userID, photoID, caption, now)
+	p, err := s.loadRepresentative(ctx, userID, dateID, photoID, true)
 	if err != nil {
 		return submitResult{}, err
 	}
@@ -125,6 +129,22 @@ func (s *DateService) submitTx(ctx context.Context, userID, dateID, photoID uuid
 		}
 	}
 	return submitResult{date: next, revealed: revealed, rep: rep, dropped: dropped}, nil
+}
+
+// verifyObject 는 복사 직전에 temp 객체를 다시 확인한다.
+// presigned PUT 은 complete 이후에도 만료 전까지 쓸 수 있으므로 complete 시점의 크기 검사만으로는 부족하다.
+func (s *DateService) verifyObject(ctx context.Context, p photo.Photo) error {
+	info, err := s.d.Storage.Stat(ctx, out.BucketTemp, p.TempKey)
+	if errors.Is(err, out.ErrObjectNotFound) {
+		return apperr.New(apperr.PhotoNotUploaded, "photo is not uploaded")
+	}
+	if err != nil {
+		return fmt.Errorf("stat temp object: %w", err)
+	}
+	if info.Size > photo.MaxSizeBytes {
+		return apperr.New(apperr.PhotoInvalid, "photo exceeds 20MB")
+	}
+	return nil
 }
 
 // discardPermanentCopy 는 트랜잭션 실패 시 permanent 사본을 지운다.

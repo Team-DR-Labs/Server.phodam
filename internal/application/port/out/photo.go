@@ -22,9 +22,11 @@ type PhotoRepository interface {
 	// DeleteReserved 는 이 데이트에서 owner 의 reserved 사진을 deleted 로 바꾸고 바뀐 사진을 반환한다.
 	DeleteReserved(ctx context.Context, dateID, ownerID uuid.UUID, now time.Time) ([]photo.Photo, error)
 	MarkTempPurged(ctx context.Context, id uuid.UUID, now time.Time) error
+	// MarkDeleted 는 사진이 아직 from 상태 중 하나일 때만 deleted 로 바꾼다. 바꿨으면 true.
+	MarkDeleted(ctx context.Context, id uuid.UUID, now time.Time, from ...photo.Status) (bool, error)
 
-	// 워커용: 각 메서드는 FOR UPDATE SKIP LOCKED 로 대상을 잠근다 (트랜잭션 안에서 호출).
-	LockExpiredLeftovers(ctx context.Context, limit int) ([]photo.Photo, error)
-	LockReceiveOverdue(ctx context.Context, now time.Time, limit int) ([]photo.Photo, error)
-	LockArchivedWithTemp(ctx context.Context, limit int) ([]photo.Photo, error)
+	// 워커 정리 대상 조회. 객체 삭제(네트워크)를 DB 잠금 밖에서 하도록 잠그지 않고 읽는다.
+	ListExpiredLeftovers(ctx context.Context, limit int) ([]photo.Photo, error)
+	ListReceiveOverdue(ctx context.Context, now time.Time, limit int) ([]photo.Photo, error)
+	ListArchivedWithTemp(ctx context.Context, limit int) ([]photo.Photo, error)
 }

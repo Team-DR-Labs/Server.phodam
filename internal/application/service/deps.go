@@ -84,8 +84,14 @@ func (d Deps) buildView(ctx context.Context, date dating.Date, viewer uuid.UUID)
 	return date.ViewFor(viewer, pu.Profile(), shots, d.now()), nil
 }
 
+// pushTimeout 은 알림 발송 한 번에 쓰는 최대 시간이다.
+const pushTimeout = 5 * time.Second
+
 // notify 는 사용자들의 기기로 푸시를 보낸다. 실패는 로그만 남긴다 (정책 §12).
-func (d Deps) notify(ctx context.Context, t push.Type, dateID uuid.UUID, userIDs ...uuid.UUID) {
+// 비즈니스 처리는 이미 커밋됐으므로 클라이언트가 연결을 끊어도 발송은 계속한다.
+func (d Deps) notify(parent context.Context, t push.Type, dateID uuid.UUID, userIDs ...uuid.UUID) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(parent), pushTimeout)
+	defer cancel()
 	tokens, err := d.Devices.ListTokens(ctx, userIDs...)
 	if err != nil {
 		d.Logger.WarnContext(ctx, "list device tokens", slog.Any("error", err))

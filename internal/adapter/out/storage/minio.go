@@ -9,6 +9,7 @@ import (
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/minio/minio-go/v7/pkg/lifecycle"
 
 	"github.com/Team-DR-Labs/Server.phodam/internal/application/port/out"
 	"github.com/Team-DR-Labs/Server.phodam/internal/config"
@@ -102,6 +103,26 @@ func (m *MinIO) Remove(ctx context.Context, b out.Bucket, key string) error {
 	err := m.internal.RemoveObject(ctx, m.buckets[b], key, minio.RemoveObjectOptions{})
 	if err != nil && !isNotFound(err) {
 		return fmt.Errorf("remove object: %w", err)
+	}
+	return nil
+}
+
+// TempSafetyNetDays 는 temp 객체를 수명 주기 규칙으로 지우는 기한이다.
+// 정책상 temp 객체는 업로드 후 길어야 제출 마감(3일) + 수령 기한(7일) 동안만 필요하다.
+// 상태가 deleted/received 가 된 뒤 남은 presigned PUT 으로 다시 올라온 고아 객체를 지우는 안전망이다.
+const TempSafetyNetDays = 11
+
+// EnsureTempLifecycle 은 temp 버킷에 만료 규칙을 설정한다 (전체 설정을 덮어쓰므로 멱등).
+func (m *MinIO) EnsureTempLifecycle(ctx context.Context) error {
+	cfg := lifecycle.NewConfiguration()
+	cfg.Rules = []lifecycle.Rule{{
+		ID:         "phodam-temp-safety-net",
+		Status:     "Enabled",
+		RuleFilter: lifecycle.Filter{Prefix: "temp/"},
+		Expiration: lifecycle.Expiration{Days: lifecycle.ExpirationDays(TempSafetyNetDays)},
+	}}
+	if err := m.internal.SetBucketLifecycle(ctx, m.buckets[out.BucketTemp], cfg); err != nil {
+		return fmt.Errorf("set temp bucket lifecycle: %w", err)
 	}
 	return nil
 }

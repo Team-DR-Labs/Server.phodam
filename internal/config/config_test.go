@@ -69,6 +69,9 @@ func TestLoad_AppDefaults(t *testing.T) {
 	if st.PublicEndpoint != "minio:9000" || st.TempBucket != "phodam-temp" || st.PermanentBucket != "phodam-permanent" || st.Region != "us-east-1" {
 		t.Fatalf("unexpected storage defaults: %+v", st)
 	}
+	if cfg.App.Env != "production" || cfg.App.IsLocal() {
+		t.Fatalf("APP_ENV must default to production, got %q", cfg.App.Env)
+	}
 	if cfg.Worker.Interval != time.Minute || cfg.Admin.APIKey != "" || cfg.Push.CredentialsFile != "" {
 		t.Fatalf("unexpected defaults: %+v", cfg)
 	}
@@ -96,6 +99,7 @@ func TestLoad_InvalidValues(t *testing.T) {
 		{"JWT_SECRET", "short"},
 		{"STORAGE_USE_SSL", "maybe"},
 		{"WORKER_INTERVAL", "0s"},
+		{"ADMIN_API_KEY", "short-key"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.key, func(t *testing.T) {
@@ -105,5 +109,14 @@ func TestLoad_InvalidValues(t *testing.T) {
 				t.Fatalf("expected %s error, got %v", tt.key, err)
 			}
 		})
+	}
+}
+
+func TestLoad_ShortAdminKeyAllowedLocally(t *testing.T) {
+	setDBEnv(t)
+	t.Setenv("APP_ENV", "local")
+	t.Setenv("ADMIN_API_KEY", "local-admin-key")
+	if _, err := Load(); err != nil {
+		t.Fatalf("local may use a short admin key: %v", err)
 	}
 }

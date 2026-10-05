@@ -57,6 +57,10 @@ func (s *CoupleService) createInvite(ctx context.Context, userID uuid.UUID) (in.
 	now := s.d.now()
 	inv := couple.Invite{ID: uuid.New(), Code: code, CreatorID: userID, ExpiresAt: now.Add(couple.InviteTTL), CreatedAt: now}
 	err = s.d.Tx.WithinTx(ctx, func(ctx context.Context) error {
+		// 같은 사용자의 동시 발급을 직렬화해 유효한 코드가 하나만 남게 한다.
+		if err := s.d.Users.LockForUpdate(ctx, userID); err != nil {
+			return fmt.Errorf("lock user: %w", err)
+		}
 		if err := s.d.Invites.RevokeUnused(ctx, userID, now); err != nil {
 			return fmt.Errorf("revoke invites: %w", err)
 		}

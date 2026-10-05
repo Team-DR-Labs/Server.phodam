@@ -24,6 +24,10 @@ func newDeps(ctx context.Context, cfg config.Config, db *gorm.DB, logger *slog.L
 	if err != nil {
 		return service.Deps{}, err
 	}
+	// 수명 주기 규칙은 안전망이므로 설정하지 못해도 기동은 계속한다 (권한 없는 버킷 등).
+	if err := store.EnsureTempLifecycle(ctx); err != nil {
+		logger.Warn("temp bucket lifecycle not applied", slog.Any("error", err))
+	}
 	sender, err := newPushSender(ctx, cfg, logger)
 	if err != nil {
 		return service.Deps{}, err

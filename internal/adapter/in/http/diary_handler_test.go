@@ -49,6 +49,7 @@ func TestDiaryHandler_List(t *testing.T) {
 		}
 	}
 	wantError(t, do(t, r, call{method: http.MethodGet, path: "/v1/diaries?limit=x", token: "good"}), 400, apperr.ValidationFailed)
+	wantError(t, do(t, r, call{method: http.MethodGet, path: "/v1/diaries?limit=0", token: "good"}), 400, apperr.ValidationFailed)
 }
 
 func TestDiaryHandler_Detail(t *testing.T) {

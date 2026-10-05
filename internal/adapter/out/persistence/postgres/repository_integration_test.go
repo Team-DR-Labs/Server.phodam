@@ -137,20 +137,27 @@ func TestIntegration_DateLifecycleQueries(t *testing.T) {
 		if !containsID(expired, d.ID) {
 			t.Fatal("past-deadline date must expire")
 		}
-		left, err := f.photos.LockExpiredLeftovers(ctx, 1000)
+		left, err := f.photos.ListExpiredLeftovers(ctx, 1000)
 		must(t, err)
 		if !containsPhoto(left, bUploaded.ID) || containsPhoto(left, aUploaded.ID) || containsPhoto(left, rep.ID) {
 			t.Fatal("only unsubmitted participant's live photos are leftovers")
 		}
-		overdue, err := f.photos.LockReceiveOverdue(ctx, now.Add(8*24*time.Hour), 1000)
+		overdue, err := f.photos.ListReceiveOverdue(ctx, now.Add(8*24*time.Hour), 1000)
 		must(t, err)
 		if !containsPhoto(overdue, aUploaded.ID) || containsPhoto(overdue, rep.ID) {
 			t.Fatal("receive overdue targets uploaded non-representative photos only")
 		}
-		archived, err := f.photos.LockArchivedWithTemp(ctx, 1000)
+		archived, err := f.photos.ListArchivedWithTemp(ctx, 1000)
 		must(t, err)
 		if !containsPhoto(archived, rep.ID) {
 			t.Fatal("archived photo without temp purge must be listed")
+		}
+		changed, err := f.photos.MarkDeleted(ctx, bUploaded.ID, now, photo.StatusUploaded)
+		must(t, err)
+		again, err := f.photos.MarkDeleted(ctx, bUploaded.ID, now, photo.StatusUploaded)
+		must(t, err)
+		if !changed || again {
+			t.Fatalf("conditional delete: first=%v second=%v", changed, again)
 		}
 
 		page, err := f.dates.ListSubmittedByUser(ctx, f.a, nil, 10)

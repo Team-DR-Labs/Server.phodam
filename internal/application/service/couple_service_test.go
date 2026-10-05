@@ -51,6 +51,7 @@ func TestCouple_JoinRejections(t *testing.T) {
 	}{
 		{"unknown code", func(h *harness, _ *CoupleService) (string, string) { return "bob", "ABCDEFGH" }, apperr.InviteInvalid},
 		{"malformed", func(h *harness, _ *CoupleService) (string, string) { return "bob", "abc" }, apperr.ValidationFailed},
+		{"outside alphabet", func(h *harness, _ *CoupleService) (string, string) { return "bob", "O1O1O1O1" }, apperr.InviteInvalid},
 		{"expired", func(h *harness, svc *CoupleService) (string, string) {
 			inv, _ := svc.CreateInvite(ctx, h.userByNick("alice"))
 			h.clock.Advance(couple.InviteTTL + time.Second)

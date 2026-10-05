@@ -129,7 +129,11 @@ func (s *PhotoService) markUploaded(ctx context.Context, photoID uuid.UUID, size
 		if err != nil {
 			return fmt.Errorf("lock photo: %w", err)
 		}
-		if p.Status != photo.StatusReserved {
+		switch p.Status {
+		case photo.StatusReserved:
+		case photo.StatusDeleted:
+			return errNotFound("photo")
+		default:
 			updated = p
 			return nil
 		}
@@ -224,6 +228,10 @@ func (s *PhotoService) markReceived(ctx context.Context, photoID uuid.UUID) (pho
 		if p.IsReceiveAcked() {
 			updated = p
 			return nil
+		}
+		// 워커가 수령 기한 정리로 먼저 deleted 처리했을 수 있다.
+		if p.Status != photo.StatusUploaded && p.Status != photo.StatusArchived {
+			return apperr.New(apperr.ReceiveNotAvailable, "receive not available")
 		}
 		updated = p.MarkReceived(s.d.now())
 		return s.d.Photos.Update(ctx, updated)

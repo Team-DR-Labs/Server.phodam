@@ -3,7 +3,6 @@ package idtoken
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"slices"
 	"sync"
@@ -77,16 +76,16 @@ func (v *Verifier) Verify(_ context.Context, provider user.Provider, raw string)
 		jwt.WithTimeFunc(v.now),
 	)
 	if err != nil {
-		return out.IDTokenClaims{}, fmt.Errorf("verify %s token: %w", provider, err)
+		return out.IDTokenClaims{}, fmt.Errorf("%w: %s: %v", out.ErrInvalidIDToken, provider, err)
 	}
 	if !slices.Contains(p.Issuers, c.Issuer) {
-		return out.IDTokenClaims{}, fmt.Errorf("unexpected issuer %q", c.Issuer)
+		return out.IDTokenClaims{}, fmt.Errorf("%w: unexpected issuer %q", out.ErrInvalidIDToken, c.Issuer)
 	}
 	if !audienceAllowed(c.Audience, p.Audiences) {
-		return out.IDTokenClaims{}, errors.New("unexpected audience")
+		return out.IDTokenClaims{}, fmt.Errorf("%w: unexpected audience", out.ErrInvalidIDToken)
 	}
 	if c.Subject == "" {
-		return out.IDTokenClaims{}, errors.New("missing subject")
+		return out.IDTokenClaims{}, fmt.Errorf("%w: missing subject", out.ErrInvalidIDToken)
 	}
 	return out.IDTokenClaims{Subject: c.Subject, Name: c.Name}, nil
 }

@@ -104,6 +104,12 @@ func TestSubmit_Rejections(t *testing.T) {
 			_, err := NewDateService(h.deps).Submit(ctx, a, dateID, h.shoot(t, b, dateID), nil)
 			return err
 		}, apperr.NotFound},
+		{"overwritten after complete", func(t *testing.T, h *harness, a, b, dateID uuid.UUID) error {
+			p := h.shoot(t, a, dateID)
+			h.storage.put(out.BucketTemp, h.st.photos[p].TempKey, photo.MaxSizeBytes+1)
+			_, err := NewDateService(h.deps).Submit(ctx, a, dateID, p, nil)
+			return err
+		}, apperr.PhotoInvalid},
 		{"caption too long", func(t *testing.T, h *harness, a, b, dateID uuid.UUID) error {
 			_, err := NewDateService(h.deps).Submit(ctx, a, dateID, h.shoot(t, a, dateID), ptr(strings.Repeat("가", 201)))
 			return err
