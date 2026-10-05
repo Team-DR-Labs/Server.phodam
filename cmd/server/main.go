@@ -54,8 +54,10 @@ func run(logger *slog.Logger) error {
 
 	// 아웃바운드 어댑터 → 서비스 → 인바운드 어댑터 순으로 조립한다.
 	healthService := service.NewHealthService(postgres.NewHealthRepository(db))
+	deps := newDeps(ctx, cfg, db, logger)
 	router := httpadapter.NewRouter(logger,
 		httpadapter.NewHealthHandler(healthService, logger),
+		newAPI(cfg, deps, logger),
 	)
 
 	srv := &http.Server{
