@@ -1,0 +1,57 @@
+# 로컬 개발용 구성: postgres → liquibase(마이그레이션 1회 실행) → app
+# 값은 .env(선택)에서 읽고, 없으면 아래 기본값을 쓴다.
+name: phodam
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${DB_USER:-phodam}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-phodam}
+      POSTGRES_DB: ${DB_NAME:-phodam}
+    ports:
+      - "${DB_EXPOSE_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  liquibase:
+    image: liquibase/liquibase:4.33
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./db:/liquibase/changelog:ro
+    environment:
+      LIQUIBASE_SEARCH_PATH: /liquibase/changelog
+      LIQUIBASE_COMMAND_CHANGELOG_FILE: db-changelog-master.xml
+      LIQUIBASE_COMMAND_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-phodam}
+      LIQUIBASE_COMMAND_USERNAME: ${DB_USER:-phodam}
+      LIQUIBASE_COMMAND_PASSWORD: ${DB_PASSWORD:-phodam}
+    # 로컬 전용: draft 와 committed 를 모두 적용한다. 공유 DB 에는 committed 만 적용할 것.
+    command: ["update", "--contexts=draft,committed"]
+
+  app:
+    build: .
+    depends_on:
+      liquibase:
+        condition: service_completed_successfully
+    environment:
+      APP_ENV: ${APP_ENV:-local}
+      APP_PORT: 8080
+      GIN_MODE: ${GIN_MODE:-release}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-phodam}
+      DB_PASSWORD: ${DB_PASSWORD:-phodam}
+      DB_NAME: ${DB_NAME:-phodam}
+      DB_SSLMODE: disable
+    ports:
+      - "${APP_EXPOSE_PORT:-8080}:8080"
+
+volumes:
+  postgres-data:

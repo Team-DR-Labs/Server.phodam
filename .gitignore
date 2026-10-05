@@ -1,0 +1,22 @@
+# Go
+/bin/
+*.test
+*.out
+coverage.*
+
+# Env / secrets
+.env
+db/.passwd
+db/liquibase.properties
+db/secret/*.conf
+!db/secret/*.template
+
+# Liquibase
+preview*.sql
+databasechangelog.csv
+
+# Tools
+.omc/
+.idea/
+.vscode/
+.DS_Store
