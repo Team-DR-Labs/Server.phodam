@@ -147,18 +147,18 @@ func (r *RefreshTokenRepository) Create(ctx context.Context, t out.RefreshToken)
 
 // Consume 은 유효한 토큰을 원자적으로 폐기하고 소유자를 반환한다.
 func (r *RefreshTokenRepository) Consume(ctx context.Context, hash string, now time.Time) (uuid.UUID, error) {
-	var ids []uuid.UUID
+	var rows []idRow
 	err := conn(ctx, r.db).Raw(
-		`UPDATE refresh_tokens SET revoked_at = ? WHERE token_hash = ? AND revoked_at IS NULL AND expires_at > ? RETURNING user_id`,
+		`UPDATE refresh_tokens SET revoked_at = ? WHERE token_hash = ? AND revoked_at IS NULL AND expires_at > ? RETURNING user_id AS id`,
 		now, hash, now,
-	).Scan(&ids).Error
+	).Scan(&rows).Error
 	if err != nil {
 		return uuid.Nil, err
 	}
-	if len(ids) == 0 {
+	if len(rows) == 0 {
 		return uuid.Nil, out.ErrNotFound
 	}
-	return ids[0], nil
+	return rows[0].ID, nil
 }
 
 // Revoke 는 userID 소유 토큰을 폐기한다.

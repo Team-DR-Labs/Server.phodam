@@ -21,7 +21,7 @@ vet: ## 정적 분석
 tidy:
 	go mod tidy
 
-up: ## postgres → liquibase → app 전체 기동
+up: ## postgres·minio → liquibase·minio-init → app 전체 기동
 	docker compose up --build -d
 
 down: ## 컨테이너 중지

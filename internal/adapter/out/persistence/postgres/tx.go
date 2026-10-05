@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
 
@@ -66,4 +67,18 @@ func requireRow(res *gorm.DB) error {
 		return out.ErrNotFound
 	}
 	return nil
+}
+
+// idRow 는 RETURNING id 같은 단일 uuid 컬럼 조회 결과다.
+// gorm 은 uuid.UUID([16]byte) 를 바로 Scan 하면 바이트 배열로 다루므로 구조체 필드로 받는다.
+type idRow struct {
+	ID uuid.UUID
+}
+
+func ids(rows []idRow) []uuid.UUID {
+	res := make([]uuid.UUID, 0, len(rows))
+	for _, r := range rows {
+		res = append(res, r.ID)
+	}
+	return res
 }
