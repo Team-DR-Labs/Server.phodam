@@ -20,3 +20,6 @@ databasechangelog.csv
 .idea/
 .vscode/
 .DS_Store
+
+# 로컬 전용 compose 오버라이드(개인 비밀 파일 마운트)
+docker-compose.override.yml
